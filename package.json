@@ -1,33 +1,31 @@
 {
-  "name": "aws-sandbox",
-  "version": "1.0.0",
-  "description": "��#\u0000 \u0000p\u0000r\u0000o\u0000f\u0000i\u0000l\u0000e\u0000s\u0000a\u0000p\u0000p\u0000\r\u0000 \u0000",
-  "main": "index.js",
+  "name": "profilesapp",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/joseph-tbdcyber/profilesapp.git"
+  "dependencies": {
+    "aws-amplify": "^6.22.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/joseph-tbdcyber/profilesapp/issues"
-  },
-  "homepage": "https://github.com/joseph-tbdcyber/profilesapp#readme",
   "devDependencies": {
     "@aws-amplify/backend": "^1.25.1",
     "@aws-amplify/backend-cli": "^1.10.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
     "aws-cdk-lib": "^2.268.0",
     "constructs": "^10.8.1",
     "esbuild": "^0.28.2",
+    "oxlint": "^1.81.0",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "aws-amplify": "^6.22.0"
+    "typescript": "^5.9.3",
+    "vite": "^8.3.0"
   }
 }
