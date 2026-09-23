@@ -190,8 +190,25 @@ ORDER BY s.created_at DESC LIMIT 5;
 ```
 
 **In the browser:** open the form, type `Acme` in the vendor name — a match
-banner appears within a moment and the "how do you want to proceed" panel opens.
-Complete the form and the final screen shows the stored submission id.
+banner appears and the "how do you want to proceed" panel opens. Complete the
+form and the final screen shows the stored submission id.
+
+### Warm the database up before demoing
+
+With `MinAcu=0` the cluster pauses after 5 idle minutes. The first request then
+has to wake it: **measured at ~18 seconds** end to end. The Lambdas retry
+automatically so it succeeds rather than erroring, but 18 seconds of nothing
+happening looks broken to an audience.
+
+Fire one request a minute before you present:
+
+```bash
+curl -s -X POST "$API/vendor-match" -H 'content-type: application/json' -d '{"name":"Acme"}'
+```
+
+It stays warm for 5 minutes after the last query. If you would rather it never
+pause, redeploy with `MinAcu=0.5` — but then it bills continuously, around
+$0.06/hour, roughly $44/month.
 
 ---
 
