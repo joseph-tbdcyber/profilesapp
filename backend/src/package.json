@@ -1,0 +1,14 @@
+{
+  "name": "tprm-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lambda handlers for the TPRM intake POC",
+  "dependencies": {
+    "@aws-sdk/client-rds-data": "^3.700.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.9.3"
+  }
+}

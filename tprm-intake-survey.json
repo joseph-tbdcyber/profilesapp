@@ -1,0 +1,399 @@
+{
+  "title": "Third-Party Risk Intake",
+  "description": "Report a third-party vendor and the software, services, or data flows they provide. One submission can cover multiple items from the same vendor.",
+  "showProgressBar": "top",
+  "progressBarType": "pages",
+  "checkErrorsMode": "onValueChanged",
+  "clearInvisibleValues": "onHiddenContainer",
+  "widthMode": "responsive",
+  "pages": [
+    {
+      "name": "requester",
+      "title": "About you",
+      "elements": [
+        {
+          "type": "text",
+          "name": "submitter_name",
+          "title": "Your name",
+          "isRequired": true
+        },
+        {
+          "type": "text",
+          "name": "submitter_email",
+          "title": "Your work email",
+          "inputType": "email",
+          "isRequired": true,
+          "validators": [{ "type": "email" }]
+        },
+        {
+          "type": "dropdown",
+          "name": "department",
+          "title": "Requesting department",
+          "isRequired": true,
+          "choices": ["IT", "Security", "Finance", "Legal", "HR", "Operations", "Marketing", "Sales", "Engineering", "Other"]
+        },
+        {
+          "type": "text",
+          "name": "business_owner",
+          "title": "Business owner of this relationship",
+          "description": "Who owns the decision to use this vendor? Leave blank if that is you.",
+          "placeholder": "Name or email"
+        },
+        {
+          "type": "radiogroup",
+          "name": "request_reason",
+          "title": "What are you reporting?",
+          "isRequired": true,
+          "choices": [
+            { "value": "new", "text": "A new third party we want to use" },
+            { "value": "existing_change", "text": "A change to a third party we already use" },
+            { "value": "renewal", "text": "A renewal of an existing third party" },
+            { "value": "shadow", "text": "A third party already in use that was never reviewed" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vendor",
+      "title": "The vendor",
+      "description": "The company or legal entity. We check this against our existing inventory as you type.",
+      "elements": [
+        {
+          "type": "text",
+          "name": "vendor_legal_name",
+          "title": "Vendor legal / company name",
+          "isRequired": true,
+          "placeholder": "e.g. Acme Software, Inc."
+        },
+        {
+          "type": "text",
+          "name": "vendor_website",
+          "title": "Vendor website or primary domain",
+          "inputType": "url",
+          "placeholder": "https://"
+        },
+        {
+          "type": "html",
+          "name": "vendor_match_display",
+          "html": "<div id='vendor-match-slot' style='min-height:1px'></div>"
+        },
+        {
+          "type": "panel",
+          "name": "match_redirect",
+          "visibleIf": "{vendorMatchStatus} notempty and {vendorMatchStatus} != 'none'",
+          "title": "We found a possible match in our inventory",
+          "elements": [
+            {
+              "type": "html",
+              "name": "match_redirect_note",
+              "html": "<p>This vendor or item may already exist. Approved items can be adopted directly; rejected items require the exception process. Tell us how to proceed.</p>"
+            },
+            {
+              "type": "radiogroup",
+              "name": "match_action",
+              "title": "How would you like to proceed?",
+              "isRequired": true,
+              "choices": [
+                { "value": "same_stop", "text": "This is the same item already on file - stop here" },
+                { "value": "different_continue", "text": "This is a different item from the same vendor - continue" },
+                { "value": "unsure_triage", "text": "Not sure - route me to the TPRM team" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "items",
+      "title": "The third-party items",
+      "description": "Add each distinct software, service, or data flow this vendor provides. Add as many as apply.",
+      "visibleIf": "{match_action} anyof ['different_continue', 'unsure_triage'] or {vendorMatchStatus} = 'none' or {vendorMatchStatus} empty",
+      "elements": [
+        {
+          "type": "paneldynamic",
+          "name": "third_party_items",
+          "title": "Items provided by this vendor",
+          "isRequired": true,
+          "minPanelCount": 1,
+          "panelCount": 1,
+          "allowAddPanel": true,
+          "allowRemovePanel": true,
+          "panelAddText": "Add another item from this vendor",
+          "panelRemoveText": "Remove this item",
+          "templateTitle": "Item {panelIndex}: {panel.item_name}",
+          "templateElements": [
+            {
+              "type": "text",
+              "name": "item_name",
+              "title": "Item name",
+              "isRequired": true,
+              "placeholder": "e.g. Acme Analytics Cloud"
+            },
+            {
+              "type": "dropdown",
+              "name": "item_type",
+              "title": "Item type",
+              "isRequired": true,
+              "choices": [
+                { "value": "saas", "text": "SaaS application" },
+                { "value": "software", "text": "On-premise / installed software" },
+                { "value": "service", "text": "Professional or managed service" },
+                { "value": "data_processor", "text": "Data processor (handles our data on our behalf)" },
+                { "value": "hardware", "text": "Hardware / device" },
+                { "value": "other", "text": "Other" }
+              ]
+            },
+            {
+              "type": "text",
+              "name": "item_url",
+              "title": "Product URL",
+              "inputType": "url",
+              "visibleIf": "{panel.item_type} = 'saas'",
+              "placeholder": "https://"
+            },
+            {
+              "type": "comment",
+              "name": "item_description",
+              "title": "What is it and what does it do?",
+              "isRequired": true
+            },
+            {
+              "type": "comment",
+              "name": "business_purpose",
+              "title": "Why do we need it? (business purpose)"
+            },
+            {
+              "type": "checkbox",
+              "name": "data_types",
+              "title": "What data will this item store, process, or transmit?",
+              "isRequired": true,
+              "colCount": 2,
+              "choices": [
+                { "value": "public", "text": "Public / no sensitive data" },
+                { "value": "internal", "text": "Internal business data" },
+                { "value": "pii", "text": "Personal data (PII)" },
+                { "value": "phi", "text": "Health data (PHI)" },
+                { "value": "pci", "text": "Payment card data (PCI)" },
+                { "value": "financial", "text": "Financial / accounting data" },
+                { "value": "secrets", "text": "Credentials, keys, or secrets" }
+              ]
+            },
+            {
+              "type": "checkbox",
+              "name": "data_actions",
+              "title": "How does it handle that data?",
+              "visibleIf": "{panel.data_types} anyof ['internal','pii','phi','pci','financial','secrets']",
+              "choices": [
+                { "value": "store", "text": "Stores it" },
+                { "value": "process", "text": "Processes it" },
+                { "value": "transmit", "text": "Transmits it" }
+              ]
+            },
+            {
+              "type": "panel",
+              "name": "data_security_deep_dive",
+              "title": "Data security details",
+              "description": "Shown because this item handles sensitive data.",
+              "visibleIf": "{panel.data_types} anyof ['pii','phi','pci','financial','secrets']",
+              "elements": [
+                {
+                  "type": "radiogroup",
+                  "name": "encryption_rest",
+                  "title": "Is our data encrypted at rest?",
+                  "choices": ["Yes", "No", "Unknown"]
+                },
+                {
+                  "type": "radiogroup",
+                  "name": "encryption_transit",
+                  "title": "Is our data encrypted in transit?",
+                  "choices": ["Yes", "No", "Unknown"]
+                },
+                {
+                  "type": "radiogroup",
+                  "name": "breach_notification",
+                  "title": "Does the vendor contractually commit to breach notification?",
+                  "choices": ["Yes", "No", "Unknown"]
+                },
+                {
+                  "type": "boolean",
+                  "name": "uses_subprocessors",
+                  "title": "Does the vendor use subprocessors for our data?"
+                },
+                {
+                  "type": "dropdown",
+                  "name": "data_residency",
+                  "title": "Where is our data stored?",
+                  "choices": ["US only", "EU only", "US and EU", "Global / multiple regions", "Unknown"]
+                },
+                {
+                  "type": "checkbox",
+                  "name": "attestations",
+                  "title": "Which attestations does the vendor hold?",
+                  "colCount": 2,
+                  "choices": ["SOC 2 Type II", "ISO 27001", "PCI DSS", "HITRUST", "FedRAMP"],
+                  "showNoneItem": true,
+                  "noneText": "None / Unknown"
+                }
+              ]
+            },
+            {
+              "type": "boolean",
+              "name": "integrates",
+              "title": "Does this item integrate with, or get access to, our systems, network, or accounts?"
+            },
+            {
+              "type": "panel",
+              "name": "access_deep_dive",
+              "title": "Access and integration details",
+              "description": "Shown because this item connects to our environment.",
+              "visibleIf": "{panel.integrates} = true",
+              "elements": [
+                {
+                  "type": "checkbox",
+                  "name": "integration_types",
+                  "title": "How does it connect?",
+                  "colCount": 2,
+                  "choices": [
+                    { "value": "sso", "text": "SSO / federated login" },
+                    { "value": "api", "text": "API access to our systems" },
+                    { "value": "network", "text": "Network / VPN connection" },
+                    { "value": "agent", "text": "Agent installed on our endpoints" },
+                    { "value": "physical", "text": "Physical / on-site access" }
+                  ]
+                },
+                {
+                  "type": "dropdown",
+                  "name": "auth_method",
+                  "title": "Primary authentication method",
+                  "choices": [
+                    { "value": "saml", "text": "SSO / SAML" },
+                    { "value": "oauth", "text": "OAuth / OIDC" },
+                    { "value": "apikey", "text": "API key" },
+                    { "value": "userpass", "text": "Username and password" },
+                    { "value": "other", "text": "Other / Unknown" }
+                  ]
+                },
+                {
+                  "type": "boolean",
+                  "name": "privileged_access",
+                  "title": "Does it require privileged or admin access?"
+                }
+              ]
+            },
+            {
+              "type": "rating",
+              "name": "criticality",
+              "title": "How critical is this item to the business?",
+              "rateMin": 1,
+              "rateMax": 5,
+              "minRateDescription": "Nice to have",
+              "maxRateDescription": "Business-critical"
+            },
+            {
+              "type": "panel",
+              "name": "resilience_deep_dive",
+              "title": "Business continuity details",
+              "description": "Shown because this item is business-critical.",
+              "visibleIf": "{panel.criticality} >= 4",
+              "elements": [
+                {
+                  "type": "dropdown",
+                  "name": "users_affected",
+                  "title": "How many people rely on it?",
+                  "choices": ["1-10", "11-50", "51-250", "251-1000", "1000+"]
+                },
+                {
+                  "type": "dropdown",
+                  "name": "downtime_tolerance",
+                  "title": "How long could we tolerate it being down?",
+                  "choices": ["Minutes", "A few hours", "About a day", "Several days", "A week or more"]
+                },
+                {
+                  "type": "boolean",
+                  "name": "alternative_exists",
+                  "title": "Is there an alternative or fallback if this vendor fails?"
+                }
+              ]
+            },
+            {
+              "type": "expression",
+              "name": "provisional_tier",
+              "title": "Provisional risk tier (auto-calculated)",
+              "expression": "iif({panel.data_types} anyof ['phi','pci','secrets'] or {panel.privileged_access} = true, 'Tier 1 - High', iif({panel.data_types} anyof ['pii','financial'] or {panel.criticality} >= 4 or {panel.integrates} = true, 'Tier 2 - Medium', 'Tier 3 - Low'))"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "commercial",
+      "title": "Contract and commercials",
+      "visibleIf": "{match_action} anyof ['different_continue', 'unsure_triage'] or {vendorMatchStatus} = 'none' or {vendorMatchStatus} empty",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "contract_status",
+          "title": "Is there a contract?",
+          "isRequired": true,
+          "choices": [
+            { "value": "executed", "text": "Yes, executed" },
+            { "value": "negotiating", "text": "In negotiation" },
+            { "value": "none", "text": "No contract yet" },
+            { "value": "unknown", "text": "Unknown" }
+          ]
+        },
+        {
+          "type": "text",
+          "name": "contract_owner",
+          "title": "Contract owner",
+          "visibleIf": "{contract_status} anyof ['executed', 'negotiating']"
+        },
+        {
+          "type": "text",
+          "name": "clm_reference",
+          "title": "Leah CLM record ID or link, if known",
+          "visibleIf": "{contract_status} anyof ['executed', 'negotiating']",
+          "placeholder": "CLM-000000 or URL"
+        },
+        {
+          "type": "dropdown",
+          "name": "annual_spend",
+          "title": "Approximate annual spend",
+          "choices": ["Under $10k", "$10k - $50k", "$50k - $250k", "$250k - $1M", "Over $1M", "Unknown"]
+        },
+        {
+          "type": "checkbox",
+          "name": "exhibits_attached",
+          "title": "Which security exhibits are attached to the current contract, if known?",
+          "description": "Leave blank if unknown. Our review will confirm which exhibits should apply.",
+          "visibleIf": "{contract_status} anyof ['executed', 'negotiating']",
+          "colCount": 2,
+          "choices": [
+            "Exhibit 1", "Exhibit 2", "Exhibit 3", "Exhibit 4", "Exhibit 5", "Exhibit 6"
+          ],
+          "showNoneItem": true,
+          "noneText": "None / Unknown"
+        }
+      ]
+    },
+    {
+      "name": "review",
+      "title": "Review and submit",
+      "visibleIf": "{match_action} anyof ['different_continue', 'unsure_triage'] or {vendorMatchStatus} = 'none' or {vendorMatchStatus} empty",
+      "elements": [
+        {
+          "type": "html",
+          "name": "next_steps",
+          "html": "<p>After you submit, the TPRM team confirms there are no duplicates, sets the risk tier, and runs the contract-language review to determine which security exhibits to require. You will get a ticket reference by email.</p>"
+        },
+        {
+          "type": "boolean",
+          "name": "attestation",
+          "title": "I confirm this information is accurate to the best of my knowledge.",
+          "isRequired": true,
+          "requiredErrorText": "Please confirm before submitting."
+        }
+      ]
+    }
+  ]
+}

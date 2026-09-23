@@ -1,0 +1,295 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  Third-Party Risk (TPRM) intake POC backend.
+
+  Stands up:
+    - An Aurora PostgreSQL Serverless v2 cluster with the RDS Data API turned on
+    - Two Lambda functions (vendor-match, submit)
+    - An HTTP API that exposes them to the browser
+
+  THROWAWAY DEMO STACK. See the DeletionPolicy note on the cluster below:
+  tearing this stack down DELETES the database and all its data on purpose,
+  so that billing stops completely.
+
+# ---------------------------------------------------------------------------
+# PARAMETERS
+# Values you can change at deploy time without editing this file.
+# `sam deploy --guided` will prompt you for each one.
+# ---------------------------------------------------------------------------
+Parameters:
+
+  DatabaseName:
+    Type: String
+    Default: tprm
+    Description: Name of the PostgreSQL database created inside the cluster.
+
+  EngineVersion:
+    Type: String
+    Default: '16.15'
+    Description: >
+      Aurora PostgreSQL version. Must be new enough to support scale-to-zero
+      (auto-pause). To see what your account offers:
+        aws rds describe-db-engine-versions --engine aurora-postgresql --region us-east-2
+
+  # --- Capacity -------------------------------------------------------------
+  # IMPORTANT: these are COST CEILINGS for a throwaway demo, not a sizing
+  # recommendation. Real sizing needs measured metrics (CPU P95/max, storage,
+  # connections) from CloudWatch. Run the demo, watch the ACUUtilization and
+  # ServerlessDatabaseCapacity metrics in CloudWatch, then tune these.
+  MinAcu:
+    Type: Number
+    Default: 0
+    Description: >
+      Minimum Aurora Capacity Units. 0 enables AUTO-PAUSE: after the cluster sits
+      idle for SecondsUntilAutoPause it pauses and stops billing for compute.
+      This is the main cost lever for a demo. If your chosen EngineVersion does
+      not support auto-pause, the stack will fail to create - set this to 0.5.
+
+  MaxAcu:
+    Type: Number
+    Default: 1
+    Description: >
+      Maximum Aurora Capacity Units - a hard budget cap on how large the database
+      can scale. Low on purpose so a runaway query cannot run up a bill. Raise it
+      if queries feel slow.
+
+  SecondsUntilAutoPause:
+    Type: Number
+    Default: 300
+    MinValue: 300
+    MaxValue: 86400
+    Description: >
+      How long the cluster must be idle before auto-pausing. 300 (5 min, the
+      minimum) is cheapest. NOTE: the first request after a pause has to wake the
+      cluster and may take several seconds or time out - just retry it.
+
+  # --- CORS -----------------------------------------------------------------
+  AllowedOrigin:
+    Type: String
+    Default: https://main.d1jqxcw68kj5bb.amplifyapp.com
+    Description: >
+      The website origin allowed to call this API from a browser. Browsers block
+      cross-site calls unless the API explicitly allows the caller's origin (CORS).
+      This is your Amplify site. localhost is allowed separately below.
+
+Resources:
+
+  # =========================================================================
+  # DATABASE
+  # =========================================================================
+  # An Aurora "cluster" holds your data and configuration. Serverless v2 means
+  # capacity scales automatically between MinAcu and MaxAcu instead of you
+  # picking a fixed server size.
+  #
+  # No VPC resources are defined here on purpose. Aurora always lives inside a
+  # VPC, but with no DBSubnetGroupName specified it uses your account's DEFAULT
+  # VPC. That keeps this stack small and avoids NAT Gateway charges. Because our
+  # Lambdas reach the database over the Data API (plain HTTPS) rather than a
+  # direct database connection, they never need to join the VPC at all.
+  DbCluster:
+    Type: AWS::RDS::DBCluster
+    # CloudFormation's DEFAULT behaviour for a database is to take a final
+    # snapshot when deleted. Snapshots cost money and would keep billing after
+    # teardown, so for this throwaway POC we override that to Delete.
+    # >>> THIS MEANS TEARDOWN PERMANENTLY DESTROYS ALL DATA. <<<
+    # For anything you care about, change these to Snapshot.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Engine: aurora-postgresql
+      EngineVersion: !Ref EngineVersion
+      # Serverless v2 counterintuitively uses EngineMode "provisioned"; the
+      # serverless part comes from the db.serverless instance class below.
+      EngineMode: provisioned
+      DatabaseName: !Ref DatabaseName
+      MasterUsername: postgres
+      # Let RDS generate the password and store it in AWS Secrets Manager for us.
+      # We never see, type, or commit a password anywhere.
+      ManageMasterUserPassword: true
+      # THE DATA API. This is what lets Lambda talk to Postgres over HTTPS with
+      # IAM auth, instead of opening a database connection inside a VPC.
+      EnableHttpEndpoint: true
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref MinAcu
+        MaxCapacity: !Ref MaxAcu
+        SecondsUntilAutoPause: !Ref SecondsUntilAutoPause
+      # Minimum retention. Backups of a tiny demo DB are essentially free, and 1
+      # is the lowest allowed value.
+      BackupRetentionPeriod: 1
+      Tags:
+        - Key: created_by
+          Value: aurora-skill
+        - Key: generation_model
+          Value: claude-opus-5[1m]
+        - Key: project
+          Value: tprm-intake-poc
+
+  # A cluster needs at least one instance to actually serve queries.
+  # "db.serverless" is the instance class that makes this Serverless v2.
+  DbInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DBClusterIdentifier: !Ref DbCluster
+      DBInstanceClass: db.serverless
+      Engine: aurora-postgresql
+      Tags:
+        - Key: created_by
+          Value: aurora-skill
+        - Key: generation_model
+          Value: claude-opus-5[1m]
+        - Key: project
+          Value: tprm-intake-poc
+
+  # =========================================================================
+  # HTTP API
+  # =========================================================================
+  # API Gateway HTTP API - the public front door. It receives browser requests
+  # and forwards them to the Lambda functions.
+  #
+  # TODO(auth): these routes are PUBLIC - anyone with the URL can call them.
+  # To lock this down later, add a JWT authorizer pointing at your Cognito user
+  # pool here, and attach it to the routes:
+  #   Auth:
+  #     Authorizers:
+  #       CognitoAuth:
+  #         IdentitySource: $request.header.Authorization
+  #         JwtConfiguration:
+  #           issuer: https://cognito-idp.<region>.amazonaws.com/<user-pool-id>
+  #           audience: [<app-client-id>]
+  #     DefaultAuthorizer: CognitoAuth
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+          # Vite's dev server and a plain local static server, for local testing.
+          - http://localhost:5173
+          - http://localhost:3000
+          - http://localhost:8080
+        AllowHeaders:
+          - content-type
+        AllowMethods:
+          - POST
+          - OPTIONS
+        MaxAge: 300
+
+  # =========================================================================
+  # LAMBDA FUNCTIONS
+  # =========================================================================
+  # Shared settings so we don't repeat ourselves on every function.
+  # Each function gets the three things it needs to reach the database:
+  # the cluster ARN, the secret ARN, and the database name.
+
+  VendorMatchFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      # Build the TypeScript with esbuild. No Docker required.
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - vendor-match/index.ts
+    Properties:
+      CodeUri: src/
+      Handler: vendor-match/index.handler
+      Runtime: nodejs22.x
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          CLUSTER_ARN: !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:cluster:${DbCluster}
+          SECRET_ARN: !GetAtt DbCluster.MasterUserSecret.SecretArn
+          DATABASE_NAME: !Ref DatabaseName
+      # LEAST PRIVILEGE: this role can run statements against THIS cluster and
+      # read THIS one secret. Nothing else in the account.
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - rds-data:ExecuteStatement
+                - rds-data:BatchExecuteStatement
+              Resource: !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:cluster:${DbCluster}
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !GetAtt DbCluster.MasterUserSecret.SecretArn
+      Events:
+        Post:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /vendor-match
+            Method: POST
+
+  SubmitFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - submit/index.ts
+    Properties:
+      CodeUri: src/
+      Handler: submit/index.handler
+      Runtime: nodejs22.x
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          CLUSTER_ARN: !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:cluster:${DbCluster}
+          SECRET_ARN: !GetAtt DbCluster.MasterUserSecret.SecretArn
+          DATABASE_NAME: !Ref DatabaseName
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                # Submit writes across three tables, so it also needs transactions.
+                - rds-data:ExecuteStatement
+                - rds-data:BatchExecuteStatement
+                - rds-data:BeginTransaction
+                - rds-data:CommitTransaction
+                - rds-data:RollbackTransaction
+              Resource: !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:cluster:${DbCluster}
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !GetAtt DbCluster.MasterUserSecret.SecretArn
+      Events:
+        Post:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /submit
+            Method: POST
+
+# ---------------------------------------------------------------------------
+# OUTPUTS
+# Printed after a successful deploy. You need ApiBaseUrl for the form, and the
+# two ARNs for the schema/seed script.
+# ---------------------------------------------------------------------------
+Outputs:
+
+  ApiBaseUrl:
+    Description: Base URL of the HTTP API. Put this in the form's API_BASE setting.
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+
+  ClusterArn:
+    Description: Aurora cluster ARN (needed by scripts/init-db.mjs).
+    Value: !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:cluster:${DbCluster}
+
+  SecretArn:
+    Description: Secrets Manager ARN holding the DB credentials (needed by scripts/init-db.mjs).
+    Value: !GetAtt DbCluster.MasterUserSecret.SecretArn
+
+  DatabaseName:
+    Description: Database name inside the cluster.
+    Value: !Ref DatabaseName

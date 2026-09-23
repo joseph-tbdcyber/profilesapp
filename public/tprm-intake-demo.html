@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Third-Party Risk Intake - Demo</title>
+<style>
+  :root{
+    --navy:#13233F; --blue:#2563EB; --blue-d:#1D4FD7;
+    --page:#F7F9FC; --card:#FFFFFF; --border:#E2E8F0; --border-2:#CBD5E1;
+    --slate:#334155; --muted:#64748B;
+    --ok-bg:#ECFDF5; --ok-bd:#A7F3D0; --ok-fg:#15803D;
+    --warn-bg:#FFFBEB; --warn-bd:#FDE68A; --warn-fg:#B45309;
+    --bad-bg:#FEF2F2; --bad-bd:#FECACA; --bad-fg:#B91C1C;
+    --tint:#F3F6FB;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--slate);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;padding:24px 16px}
+  .wrap{max-width:780px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+    box-shadow:0 8px 24px rgba(19,35,63,.06);overflow:hidden}
+  .head{padding:22px 26px 18px}
+  .head h1{margin:0 0 4px;font-size:22px;color:var(--navy);letter-spacing:-.01em}
+  .head p{margin:0;color:var(--muted);font-size:14px}
+  .progress{height:6px;background:#EEF2F8}
+  .progress > div{height:100%;background:var(--blue);transition:width .25s ease}
+  .step-label{padding:14px 26px 0;font-size:12px;color:var(--muted);font-weight:600}
+  .hint{margin:14px 26px 0;background:var(--tint);border:1px solid var(--border);
+    border-radius:10px;padding:12px 14px;font-size:13px;color:var(--slate)}
+  .hint b{color:var(--navy)}
+  .body{padding:18px 26px 8px}
+  .page-title{font-size:18px;color:var(--navy);margin:6px 0 2px;font-weight:700}
+  .page-desc{color:var(--muted);font-size:14px;margin:0 0 12px}
+  .q{margin:16px 0}
+  .q > label.qlabel{display:block;font-weight:600;color:var(--navy);font-size:14px;margin-bottom:6px}
+  .q .qdesc{color:var(--muted);font-size:12.5px;margin:-2px 0 8px}
+  .req{color:var(--blue);margin-left:3px}
+  input[type=text],input[type=email],input[type=url],textarea,select{
+    width:100%;padding:10px 12px;border:1px solid var(--border-2);border-radius:9px;
+    font-size:14px;font-family:inherit;color:var(--slate);background:#fff}
+  textarea{min-height:74px;resize:vertical}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--blue);
+    box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{display:flex;align-items:flex-start;gap:9px;padding:9px 11px;border:1px solid var(--border);
+    border-radius:9px;cursor:pointer;font-size:14px;background:#fff}
+  .opt:hover{border-color:var(--border-2)}
+  .opt.sel{border-color:var(--blue);background:rgba(37,99,235,.05)}
+  .opt input{margin-top:2px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media(max-width:560px){.grid2{grid-template-columns:1fr}}
+  .yn{display:inline-flex;gap:8px}
+  .yn button{padding:8px 20px;border:1px solid var(--border-2);background:#fff;border-radius:9px;
+    font-size:14px;cursor:pointer;color:var(--slate)}
+  .yn button.sel{background:var(--blue);border-color:var(--blue);color:#fff}
+  .rate{display:inline-flex;gap:6px;flex-wrap:wrap}
+  .rate button{width:42px;height:42px;border:1px solid var(--border-2);background:#fff;border-radius:9px;
+    font-size:15px;font-weight:600;cursor:pointer;color:var(--slate)}
+  .rate button.sel{background:var(--blue);border-color:var(--blue);color:#fff}
+  .raterow{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:5px;max-width:270px}
+  .panel{border:1px solid var(--border);border-radius:11px;padding:6px 16px 12px;margin:14px 0;background:#fff}
+  .subpanel{background:var(--tint);border:1px solid var(--border);border-radius:11px;
+    padding:4px 16px 12px;margin:14px 0;animation:reveal .22s ease}
+  @keyframes reveal{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+  .panel-h{font-weight:700;color:var(--navy);font-size:14.5px;margin:12px 0 2px}
+  .panel-d{color:var(--muted);font-size:12.5px;margin:0 0 6px;font-style:italic}
+  .pd-item{border:1px solid var(--border-2);border-radius:12px;padding:4px 16px 14px;margin:12px 0;position:relative}
+  .pd-head{display:flex;justify-content:space-between;align-items:center;margin:12px 0 2px}
+  .pd-head .t{font-weight:700;color:var(--navy);font-size:14.5px}
+  .btn{border:none;border-radius:9px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-primary:hover{background:var(--blue-d)}
+  .btn-ghost{background:#fff;border:1px solid var(--border-2);color:var(--slate)}
+  .btn-ghost:hover{border-color:var(--muted)}
+  .btn-link{background:none;border:none;color:var(--blue);font-weight:600;cursor:pointer;padding:4px 0;font-size:13.5px}
+  .btn-remove{background:none;border:1px solid var(--bad-bd);color:var(--bad-fg);border-radius:8px;
+    padding:5px 10px;font-size:12.5px;cursor:pointer}
+  .add-row{margin:8px 0 4px}
+  .foot{display:flex;justify-content:space-between;align-items:center;padding:16px 26px 22px;border-top:1px solid var(--border);margin-top:8px}
+  .banner{border-radius:10px;padding:11px 14px;font-size:13.5px;margin:10px 0}
+  .banner.ok{background:var(--ok-bg);border:1px solid var(--ok-bd);color:var(--ok-fg)}
+  .banner.warn{background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn-fg)}
+  .banner.bad{background:var(--bad-bg);border:1px solid var(--bad-bd);color:var(--bad-fg)}
+  .banner.info{background:var(--tint);border:1px solid var(--border);color:var(--slate)}
+  .tier{display:inline-block;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:700}
+  .tier.t1{background:var(--bad-bg);color:var(--bad-fg);border:1px solid var(--bad-bd)}
+  .tier.t2{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd)}
+  .tier.t3{background:var(--ok-bg);color:var(--ok-fg);border:1px solid var(--ok-bd)}
+  .err input,.err textarea,.err select{border-color:var(--bad-fg);box-shadow:0 0 0 3px rgba(185,28,28,.12)}
+  .errmsg{color:var(--bad-fg);font-size:12.5px;margin-top:5px}
+  .foot-note{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
+  pre{background:var(--navy);color:#DDE7FF;padding:16px;border-radius:11px;overflow:auto;font-size:12.5px;line-height:1.55}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="app"></div>
+  <div class="foot-note">Demo preview - drives the same JSON schema you would load into production SurveyJS.</div>
+</div>
+<script>
+/* ===== evaluator (verified with 24 unit tests) ===== */
+function splitTopLevel(str, delim){
+  const out=[];let dp=0,db=0,inStr=false,q='',buf='';
+  for(let i=0;i<str.length;i++){const c=str[i];
+    if(inStr){buf+=c;if(c===q)inStr=false;continue;}
+    if(c==="'"||c==='"'){inStr=true;q=c;buf+=c;continue;}
+    if(c==='(')dp++;if(c===')')dp--;if(c==='[')db++;if(c===']')db--;
+    if(dp===0&&db===0&&str.substr(i,delim.length)===delim){out.push(buf);buf='';i+=delim.length-1;continue;}
+    buf+=c;}
+  out.push(buf);return out;
+}
+function parseScalar(s){s=s.trim();
+  if((s.startsWith("'")&&s.endsWith("'"))||(s.startsWith('"')&&s.endsWith('"')))return s.slice(1,-1);
+  if(s==='true')return true;if(s==='false')return false;
+  if(s!==''&&!isNaN(Number(s)))return Number(s);return s;}
+function parseOperand(s){s=s.trim();
+  if(s.startsWith('[')&&s.endsWith(']')){const inner=s.slice(1,-1).trim();
+    if(inner==='')return[];return splitTopLevel(inner,',').map(parseScalar);}
+  return parseScalar(s);}
+function isEmpty(v){return v===undefined||v===null||v===''||(Array.isArray(v)&&v.length===0);}
+function resolveRef(ref,ctx){ref=ref.trim();
+  if(ref.startsWith('panel.')){const k=ref.slice(6);return ctx.panel?ctx.panel[k]:undefined;}
+  if(ctx.vars&&Object.prototype.hasOwnProperty.call(ctx.vars,ref))return ctx.vars[ref];
+  return ctx.data?ctx.data[ref]:undefined;}
+function evalAtom(atom,ctx){atom=atom.trim();
+  const m=atom.match(/^\{([^}]+)\}\s*([\s\S]*)$/);if(!m)return false;
+  const val=resolveRef(m[1],ctx);const rest=m[2].trim();
+  if(rest==='notempty')return !isEmpty(val);
+  if(rest==='empty')return isEmpty(val);
+  let sm=rest.match(/^(>=|<=|!=|=|>|<)\s*([\s\S]*)$/);
+  if(sm){const op=sm[1];const operand=parseOperand(sm[2]);
+    if(op==='='){if(typeof operand==='boolean')return Boolean(val)===operand;
+      if(typeof operand==='number')return Number(val)===operand;return String(val)===String(operand);}
+    if(op==='!='){if(typeof operand==='boolean')return Boolean(val)!==operand;
+      if(typeof operand==='number')return Number(val)!==operand;return String(val)!==String(operand);}
+    if(isEmpty(val))return false;const a=Number(val),b=Number(operand);
+    if(op==='>=')return a>=b;if(op==='<=')return a<=b;if(op==='>')return a>b;if(op==='<')return a<b;}
+  let wm=rest.match(/^(anyof|allof|contains|notcontains)\s+([\s\S]*)$/);
+  if(wm){const op=wm[1];const operand=parseOperand(wm[2]);
+    const arr=Array.isArray(val)?val:(isEmpty(val)?[]:[val]);
+    if(op==='anyof')return Array.isArray(operand)?operand.some(x=>arr.includes(x)):arr.includes(operand);
+    if(op==='allof')return Array.isArray(operand)?operand.every(x=>arr.includes(x)):arr.includes(operand);
+    if(op==='contains')return Array.isArray(val)?val.includes(operand):String(val).includes(String(operand));
+    if(op==='notcontains')return Array.isArray(val)?!val.includes(operand):!String(val).includes(String(operand));}
+  return false;}
+function evaluateCondition(expr,ctx){if(!expr||!expr.trim())return true;
+  return splitTopLevel(expr,' or ').some(g=>splitTopLevel(g,' and ').every(a=>evalAtom(a,ctx)));}
+function evalExpression(expr,ctx){expr=expr.trim();
+  if(expr.startsWith('iif(')&&expr.endsWith(')')){const inner=expr.slice(4,-1);
+    const parts=splitTopLevel(inner,',');const cond=parts[0];
+    const thenE=parts.slice(1,parts.length-1).join(',');const elseE=parts[parts.length-1];
+    return evaluateCondition(cond,ctx)?evalExpression(thenE,ctx):evalExpression(elseE,ctx);}
+  if((expr.startsWith("'")&&expr.endsWith("'"))||(expr.startsWith('"')&&expr.endsWith('"')))return expr.slice(1,-1);
+  const rm=expr.match(/^\{([^}]+)\}$/);if(rm)return resolveRef(rm[1],ctx);return expr;}
+
+/* ===== schema ===== */
+const SCHEMA = {
+  "title": "Third-Party Risk Intake",
+  "description": "Report a third-party vendor and the software, services, or data flows they provide. One submission can cover multiple items from the same vendor.",
+  "showProgressBar": "top",
+  "progressBarType": "pages",
+  "checkErrorsMode": "onValueChanged",
+  "clearInvisibleValues": "onHiddenContainer",
+  "widthMode": "responsive",
+  "pages": [
+    {
+      "name": "requester",
+      "title": "About you",
+      "elements": [
+        {
+          "type": "text",
+          "name": "submitter_name",
+          "title": "Your name",
+          "isRequired": true
+        },
+        {
+          "type": "text",
+          "name": "submitter_email",
+          "title": "Your work email",
+          "inputType": "email",
+          "isRequired": true,
+          "validators": [{ "type": "email" }]
+        },
+        {
+          "type": "dropdown",
+          "name": "department",
+          "title": "Requesting department",
+          "isRequired": true,
+          "choices": ["IT", "Security", "Finance", "Legal", "HR", "Operations", "Marketing", "Sales", "Engineering", "Other"]
+        },
+        {
+          "type": "text",
+          "name": "business_owner",
+          "title": "Business owner of this relationship",
+          "description": "Who owns the decision to use this vendor? Leave blank if that is you.",
+          "placeholder": "Name or email"
+        },
+        {
+          "type": "radiogroup",
+          "name": "request_reason",
+          "title": "What are you reporting?",
+          "isRequired": true,
+          "choices": [
+            { "value": "new", "text": "A new third party we want to use" },
+            { "value": "existing_change", "text": "A change to a third party we already use" },
+            { "value": "renewal", "text": "A renewal of an existing third party" },
+            { "value": "shadow", "text": "A third party already in use that was never reviewed" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vendor",
+      "title": "The vendor",
+      "description": "The company or legal entity. We check this against our existing inventory as you type.",
+      "elements": [
+        {
+          "type": "text",
+          "name": "vendor_legal_name",
+          "title": "Vendor legal / company name",
+          "isRequired": true,
+          "placeholder": "e.g. Acme Software, Inc."
+        },
+        {
+          "type": "text",
+          "name": "vendor_website",
+          "title": "Vendor website or primary domain",
+          "inputType": "url",
+          "placeholder": "https://"
+        },
+        {
+          "type": "html",
+          "name": "vendor_match_display",
+          "html": "<div id='vendor-match-slot' style='min-height:1px'></div>"
+        },
+        {
+          "type": "panel",
+          "name": "match_redirect",
+          "visibleIf": "{vendorMatchStatus} notempty and {vendorMatchStatus} != 'none'",
+          "title": "We found a possible match in our inventory",
+          "elements": [
+            {
+              "type": "html",
+              "name": "match_redirect_note",
+              "html": "<p>This vendor or item may already exist. Approved items can be adopted directly; rejected items require the exception process. Tell us how to proceed.</p>"
+            },
+            {
+              "type": "radiogroup",
+              "name": "match_action",
+              "title": "How would you like to proceed?",
+              "isRequired": true,
+              "choices": [
+                { "value": "same_stop", "text": "This is the same item already on file - stop here" },
+                { "value": "different_continue", "text": "This is a different item from the same vendor - continue" },
+                { "value": "unsure_triage", "text": "Not sure - route me to the TPRM team" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "items",
+      "title": "The third-party items",
+      "description": "Add each distinct software, service, or data flow this vendor provides. Add as many as apply.",
+      "visibleIf": "{match_action} anyof ['different_continue', 'unsure_triage'] or {vendorMatchStatus} = 'none' or {vendorMatchStatus} empty",
+      "elements": [
+        {
+          "type": "paneldynamic",
+          "name": "third_party_items",
+          "title": "Items provided by this vendor",
+          "isRequired": true,
+          "minPanelCount": 1,
+          "panelCount": 1,
+          "allowAddPanel": true,
+          "allowRemovePanel": true,
+          "panelAddText": "Add another item from this vendor",
+          "panelRemoveText": "Remove this item",
+          "templateTitle": "Item {panelIndex}: {panel.item_name}",
+          "templateElements": [
+            {
+              "type": "text",
+              "name": "item_name",
+              "title": "Item name",
+              "isRequired": true,
+              "placeholder": "e.g. Acme Analytics Cloud"
+            },
+            {
+              "type": "dropdown",
+              "name": "item_type",
+              "title": "Item type",
+              "isRequired": true,
+              "choices": [
+                { "value": "saas", "text": "SaaS application" },
+                { "value": "software", "text": "On-premise / installed software" },
+                { "value": "service", "text": "Professional or managed service" },
+                { "value": "data_processor", "text": "Data processor (handles our data on our behalf)" },
+                { "value": "hardware", "text": "Hardware / device" },
+                { "value": "other", "text": "Other" }
+              ]
+            },
+            {
+              "type": "text",
+              "name": "item_url",
+              "title": "Product URL",
+              "inputType": "url",
+              "visibleIf": "{panel.item_type} = 'saas'",
+              "placeholder": "https://"
+            },
+            {
+              "type": "comment",
+              "name": "item_description",
+              "title": "What is it and what does it do?",
+              "isRequired": true
+            },
+            {
+              "type": "comment",
+              "name": "business_purpose",
+              "title": "Why do we need it? (business purpose)"
+            },
+            {
+              "type": "checkbox",
+              "name": "data_types",
+              "title": "What data will this item store, process, or transmit?",
+              "isRequired": true,
+              "colCount": 2,
+              "choices": [
+                { "value": "public", "text": "Public / no sensitive data" },
+                { "value": "internal", "text": "Internal business data" },
+                { "value": "pii", "text": "Personal data (PII)" },
+                { "value": "phi", "text": "Health data (PHI)" },
+                { "value": "pci", "text": "Payment card data (PCI)" },
+                { "value": "financial", "text": "Financial / accounting data" },
+                { "value": "secrets", "text": "Credentials, keys, or secrets" }
+              ]
+            },
+            {
+              "type": "checkbox",
+              "name": "data_actions",
+              "title": "How does it handle that data?",
+              "visibleIf": "{panel.data_types} anyof ['internal','pii','phi','pci','financial','secrets']",
+              "choices": [
+                { "value": "store", "text": "Stores it" },
+                { "value": "process", "text": "Processes it" },
+                { "value": "transmit", "text": "Transmits it" }
+              ]
+            },
+            {
+              "type": "panel",
+              "name": "data_security_deep_dive",
+              "title": "Data security details",
+              "description": "Shown because this item handles sensitive data.",
+              "visibleIf": "{panel.data_types} anyof ['pii','phi','pci','financial','secrets']",
+              "elements": [
+                {
+                  "type": "radiogroup",
+                  "name": "encryption_rest",
+                  "title": "Is our data encrypted at rest?",
+                  "choices": ["Yes", "No", "Unknown"]
+                },
+                {
+                  "type": "radiogroup",
+                  "name": "encryption_transit",
+                  "title": "Is our data encrypted in transit?",
+                  "choices": ["Yes", "No", "Unknown"]
+                },
+                {
+                  "type": "radiogroup",
+                  "name": "breach_notification",
+                  "title": "Does the vendor contractually commit to breach notification?",
+                  "choices": ["Yes", "No", "Unknown"]
+                },
+                {
+                  "type": "boolean",
+                  "name": "uses_subprocessors",
+                  "title": "Does the vendor use subprocessors for our data?"
+                },
+                {
+                  "type": "dropdown",
+                  "name": "data_residency",
+                  "title": "Where is our data stored?",
+                  "choices": ["US only", "EU only", "US and EU", "Global / multiple regions", "Unknown"]
+                },
+                {
+                  "type": "checkbox",
+                  "name": "attestations",
+                  "title": "Which attestations does the vendor hold?",
+                  "colCount": 2,
+                  "choices": ["SOC 2 Type II", "ISO 27001", "PCI DSS", "HITRUST", "FedRAMP"],
+                  "showNoneItem": true,
+                  "noneText": "None / Unknown"
+                }
+              ]
+            },
+            {
+              "type": "boolean",
+              "name": "integrates",
+              "title": "Does this item integrate with, or get access to, our systems, network, or accounts?"
+            },
+            {
+              "type": "panel",
+              "name": "access_deep_dive",
+              "title": "Access and integration details",
+              "description": "Shown because this item connects to our environment.",
+              "visibleIf": "{panel.integrates} = true",
+              "elements": [
+                {
+                  "type": "checkbox",
+                  "name": "integration_types",
+                  "title": "How does it connect?",
+                  "colCount": 2,
+                  "choices": [
+                    { "value": "sso", "text": "SSO / federated login" },
+                    { "value": "api", "text": "API access to our systems" },
+                    { "value": "network", "text": "Network / VPN connection" },
+                    { "value": "agent", "text": "Agent installed on our endpoints" },
+                    { "value": "physical", "text": "Physical / on-site access" }
+                  ]
+                },
+                {
+                  "type": "dropdown",
+                  "name": "auth_method",
+                  "title": "Primary authentication method",
+                  "choices": [
+                    { "value": "saml", "text": "SSO / SAML" },
+                    { "value": "oauth", "text": "OAuth / OIDC" },
+                    { "value": "apikey", "text": "API key" },
+                    { "value": "userpass", "text": "Username and password" },
+                    { "value": "other", "text": "Other / Unknown" }
+                  ]
+                },
+                {
+                  "type": "boolean",
+                  "name": "privileged_access",
+                  "title": "Does it require privileged or admin access?"
+                }
+              ]
+            },
+            {
+              "type": "rating",
+              "name": "criticality",
+              "title": "How critical is this item to the business?",
+              "rateMin": 1,
+              "rateMax": 5,
+              "minRateDescription": "Nice to have",
+              "maxRateDescription": "Business-critical"
+            },
+            {
+              "type": "panel",
+              "name": "resilience_deep_dive",
+              "title": "Business continuity details",
+              "description": "Shown because this item is business-critical.",
+              "visibleIf": "{panel.criticality} >= 4",
+              "elements": [
+                {
+                  "type": "dropdown",
+                  "name": "users_affected",
+                  "title": "How many people rely on it?",
+                  "choices": ["1-10", "11-50", "51-250", "251-1000", "1000+"]
+                },
+                {
+                  "type": "dropdown",
+                  "name": "downtime_tolerance",
+                  "title": "How long could we tolerate it being down?",
+                  "choices": ["Minutes", "A few hours", "About a day", "Several days", "A week or more"]
+                },
+                {
+                  "type": "boolean",
+                  "name": "alternative_exists",
+                  "title": "Is there an alternative or fallback if this vendor fails?"
+                }
+              ]
+            },
+            {
+              "type": "expression",
+              "name": "provisional_tier",
+              "title": "Provisional risk tier (auto-calculated)",
+              "expression": "iif({panel.data_types} anyof ['phi','pci','secrets'] or {panel.privileged_access} = true, 'Tier 1 - High', iif({panel.data_types} anyof ['pii','financial'] or {panel.criticality} >= 4 or {panel.integrates} = true, 'Tier 2 - Medium', 'Tier 3 - Low'))"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "commercial",
+      "title": "Contract and commercials",
+      "visibleIf": "{match_action} anyof ['different_continue', 'unsure_triage'] or {vendorMatchStatus} = 'none' or {vendorMatchStatus} empty",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "contract_status",
+          "title": "Is there a contract?",
+          "isRequired": true,
+          "choices": [
+            { "value": "executed", "text": "Yes, executed" },
+            { "value": "negotiating", "text": "In negotiation" },
+            { "value": "none", "text": "No contract yet" },
+            { "value": "unknown", "text": "Unknown" }
+          ]
+        },
+        {
+          "type": "text",
+          "name": "contract_owner",
+          "title": "Contract owner",
+          "visibleIf": "{contract_status} anyof ['executed', 'negotiating']"
+        },
+        {
+          "type": "text",
+          "name": "clm_reference",
+          "title": "Leah CLM record ID or link, if known",
+          "visibleIf": "{contract_status} anyof ['executed', 'negotiating']",
+          "placeholder": "CLM-000000 or URL"
+        },
+        {
+          "type": "dropdown",
+          "name": "annual_spend",
+          "title": "Approximate annual spend",
+          "choices": ["Under $10k", "$10k - $50k", "$50k - $250k", "$250k - $1M", "Over $1M", "Unknown"]
+        },
+        {
+          "type": "checkbox",
+          "name": "exhibits_attached",
+          "title": "Which security exhibits are attached to the current contract, if known?",
+          "description": "Leave blank if unknown. Our review will confirm which exhibits should apply.",
+          "visibleIf": "{contract_status} anyof ['executed', 'negotiating']",
+          "colCount": 2,
+          "choices": [
+            "Exhibit 1", "Exhibit 2", "Exhibit 3", "Exhibit 4", "Exhibit 5", "Exhibit 6"
+          ],
+          "showNoneItem": true,
+          "noneText": "None / Unknown"
+        }
+      ]
+    },
+    {
+      "name": "review",
+      "title": "Review and submit",
+      "visibleIf": "{match_action} anyof ['different_continue', 'unsure_triage'] or {vendorMatchStatus} = 'none' or {vendorMatchStatus} empty",
+      "elements": [
+        {
+          "type": "html",
+          "name": "next_steps",
+          "html": "<p>After you submit, the TPRM team confirms there are no duplicates, sets the risk tier, and runs the contract-language review to determine which security exhibits to require. You will get a ticket reference by email.</p>"
+        },
+        {
+          "type": "boolean",
+          "name": "attestation",
+          "title": "I confirm this information is accurate to the best of my knowledge.",
+          "isRequired": true,
+          "requiredErrorText": "Please confirm before submitting."
+        }
+      ]
+    }
+  ]
+};
+
+/* ===== state ===== */
+const state={data:{},vars:{},currentPage:SCHEMA.pages[0].name,errors:{},submitted:false,payload:null};
+const app=document.getElementById('app');
+const topCtx=()=>({data:state.data,vars:state.vars});
+const pageVisible=p=>evaluateCondition(p.visibleIf||'',topCtx());
+const visiblePages=()=>SCHEMA.pages.filter(pageVisible);
+function choicesOf(el){return (el.choices||[]).map(c=>typeof c==='object'?{value:c.value,text:c.text}:{value:c,text:String(c)});}
+function interp(str,panel,idx){return String(str).replace(/\{panelIndex\}/g,idx+1).replace(/\{panel\.([a-zA-Z0-9_]+)\}/g,(m,k)=>panel[k]!=null&&panel[k]!==''?panel[k]:'');}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ===== backend API =====
+   The hardcoded mock inventory and the client-side fuzzy matcher that used to
+   live here are gone. Matching now happens in Postgres (pg_trgm) behind
+   POST /vendor-match, so the browser no longer needs to know the vendor list.
+
+   Point this at the ApiBaseUrl output from the SAM deploy, e.g.
+     https://abc123.execute-api.us-east-2.amazonaws.com
+
+   You can also set it at runtime without editing this file - use the box on
+   the vendor step, or from the console:
+     localStorage.setItem('tprm_api_base','https://...'); location.reload();
+*/
+const API_BASE_DEFAULT='';
+const API_BASE=(localStorage.getItem('tprm_api_base')||API_BASE_DEFAULT).replace(/\/+$/,'');
+
+/* Kept locally only to decide whether what has been typed is worth sending.
+   The authoritative normalization now lives in the backend. */
+function mnorm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();}
+function mhost(u){if(!u)return '';let s=String(u).toLowerCase().trim().replace(/^https?:\/\//,'').replace(/^www\./,'');return s.split('/')[0];}
+
+/* Calls POST /vendor-match and maps the response onto the {kind,vendor,score}
+   shape the existing renderer already understands, so nothing below changes. */
+async function apiMatchVendor(nm,dm){
+  if(mnorm(nm).length<3&&!mhost(dm))return{kind:'pending'};
+  if(!API_BASE)return{kind:'unconfigured'};
+  const res=await fetch(API_BASE+'/vendor-match',{
+    method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({name:nm,domain:dm})});
+  if(!res.ok)throw new Error('vendor-match returned HTTP '+res.status);
+  const data=await res.json();
+  const top=(data.candidates||[])[0];
+  if(!top||data.topStatus==='none')return{kind:'none',vendor:null,score:top?top.score:0};
+  return{kind:top.confidence==='strong'?'strong':'possible',
+         vendor:{name:top.legalName,domain:top.domain,status:top.status,items:top.items||[]},
+         score:top.score};}
+
+/* Debounced so we hit the API once the user pauses, not on every keystroke.
+   matchSeq guards against a slow earlier response overwriting a newer one. */
+let matchTimer=null,matchSeq=0;
+function scheduleMatch(){clearTimeout(matchTimer);matchTimer=setTimeout(runMatch,400);}
+async function runMatch(){
+  const seq=++matchSeq;
+  let m;
+  try{m=await apiMatchVendor(state.data.vendor_legal_name||'',state.data.vendor_website||'');}
+  catch(err){m={kind:'error',message:err.message};}
+  if(seq!==matchSeq)return;              // a newer request is already in flight
+  let status;
+  if(m.kind==='pending'||m.kind==='unconfigured'||m.kind==='error')status=undefined;
+  else if(m.kind==='none')status='none';
+  else status=m.vendor.status;
+  const sig=m.kind+'|'+(m.vendor?m.vendor.name:'')+'|'+status;
+  if(state.vars._matchSig===sig)return;
+  state.vars._matchSig=sig;state.vars.match=m;state.vars.vendorMatchStatus=status;
+  if(status==='none'||status===undefined)delete state.data.match_action;
+  renderApp();}
+/* The old "Load / Export inventory JSON" controls are gone - the vendor list
+   lives in Aurora now, not in this page. What is useful instead is seeing
+   whether the page knows where the API is, and being able to set it. */
+function buildApiBar(){
+  const bar=document.createElement('div');bar.className='hint';
+  bar.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:10px';
+  const label=document.createElement('span');
+  label.innerHTML=API_BASE
+    ?'<b>Backend:</b> <span style="color:var(--ok-fg)">configured</span>'
+    :'<b>Backend:</b> <span style="color:var(--bad-fg)">not set</span>';
+  bar.appendChild(label);
+  const url=document.createElement('input');url.type='text';url.value=API_BASE;
+  url.placeholder='https://xxxx.execute-api.us-east-2.amazonaws.com';
+  url.style.cssText='flex:1;min-width:230px;padding:6px 10px;font-size:12.5px';
+  bar.appendChild(url);
+  const save=document.createElement('button');save.type='button';save.className='btn btn-ghost';
+  save.style.cssText='padding:6px 12px;font-size:13px';save.textContent='Save';
+  save.addEventListener('click',()=>{
+    localStorage.setItem('tprm_api_base',url.value.trim());location.reload();});
+  bar.appendChild(save);
+  return bar;}
+
+function setError(id,msg){state.errors[id]=msg;}
+function clearErrors(){state.errors={};}
+
+/* ===== element renderers ===== */
+function el_text(el,store,id){
+  const wrap=document.createElement('div');
+  const type=el.inputType==='email'?'email':el.inputType==='url'?'url':'text';
+  const inp=document.createElement('input');inp.type=type;inp.id=id;inp.dataset.qid='1';
+  inp.value=store[el.name]||'';if(el.placeholder)inp.placeholder=el.placeholder;
+  inp.addEventListener('input',e=>{store[el.name]=e.target.value;
+    if(el.name==='vendor_legal_name'||el.name==='vendor_website')scheduleMatch();});
+  wrap.appendChild(inp);return wrap;}
+function el_comment(el,store,id){
+  const ta=document.createElement('textarea');ta.id=id;ta.dataset.qid='1';
+  ta.value=store[el.name]||'';if(el.placeholder)ta.placeholder=el.placeholder;
+  ta.addEventListener('input',e=>{store[el.name]=e.target.value;});return ta;}
+function el_dropdown(el,store,id){
+  const sel=document.createElement('select');sel.id=id;
+  const ph=document.createElement('option');ph.value='';ph.textContent='Select...';sel.appendChild(ph);
+  choicesOf(el).forEach(c=>{const o=document.createElement('option');o.value=c.value;o.textContent=c.text;
+    if(store[el.name]===c.value)o.selected=true;sel.appendChild(o);});
+  sel.value=store[el.name]||'';
+  sel.addEventListener('change',e=>{store[el.name]=e.target.value;renderApp();});return sel;}
+function el_radio(el,store,id){
+  const box=document.createElement('div');box.className='opts';
+  choicesOf(el).forEach((c,i)=>{const lab=document.createElement('label');
+    lab.className='opt'+(store[el.name]===c.value?' sel':'');
+    const r=document.createElement('input');r.type='radio';r.name=id;r.value=c.value;
+    r.checked=store[el.name]===c.value;
+    r.addEventListener('change',()=>{store[el.name]=c.value;renderApp();});
+    lab.appendChild(r);const sp=document.createElement('span');sp.textContent=c.text;lab.appendChild(sp);
+    box.appendChild(lab);});return box;}
+function el_checkbox(el,store,id){
+  const box=document.createElement('div');box.className='opts'+(el.colCount===2?' grid2':'');
+  const cur=Array.isArray(store[el.name])?store[el.name].slice():[];
+  const items=choicesOf(el);if(el.showNoneItem)items.push({value:'none',text:el.noneText||'None'});
+  items.forEach(c=>{const lab=document.createElement('label');
+    lab.className='opt'+(cur.includes(c.value)?' sel':'');
+    const ch=document.createElement('input');ch.type='checkbox';ch.checked=cur.includes(c.value);
+    ch.addEventListener('change',()=>{let arr=Array.isArray(store[el.name])?store[el.name].slice():[];
+      if(ch.checked){if(c.value==='none')arr=['none'];else{arr=arr.filter(x=>x!=='none');arr.push(c.value);} }
+      else arr=arr.filter(x=>x!==c.value);
+      store[el.name]=arr;renderApp();});
+    lab.appendChild(ch);const sp=document.createElement('span');sp.textContent=c.text;lab.appendChild(sp);
+    box.appendChild(lab);});return box;}
+function el_boolean(el,store,id){
+  const box=document.createElement('div');box.className='yn';
+  [['Yes',true],['No',false]].forEach(([t,v])=>{const b=document.createElement('button');b.type='button';
+    b.textContent=t;if(store[el.name]===v)b.classList.add('sel');
+    b.addEventListener('click',()=>{store[el.name]=v;renderApp();});box.appendChild(b);});return box;}
+function el_rating(el,store,id){
+  const box=document.createElement('div');const row=document.createElement('div');row.className='rate';
+  const min=el.rateMin||1,max=el.rateMax||5;
+  for(let i=min;i<=max;i++){const b=document.createElement('button');b.type='button';b.textContent=i;
+    if(store[el.name]===i)b.classList.add('sel');
+    b.addEventListener('click',()=>{store[el.name]=i;renderApp();});row.appendChild(b);}
+  box.appendChild(row);
+  if(el.minRateDescription||el.maxRateDescription){const r=document.createElement('div');r.className='raterow';
+    const a=document.createElement('span');a.textContent=el.minRateDescription||'';
+    const c=document.createElement('span');c.textContent=el.maxRateDescription||'';
+    r.appendChild(a);r.appendChild(c);box.appendChild(r);}return box;}
+function el_expression(el,store,ctx){
+  const val=evalExpression(el.expression,ctx);const wrap=document.createElement('div');
+  const cls=val.indexOf('Tier 1')>=0?'t1':val.indexOf('Tier 2')>=0?'t2':'t3';
+  const b=document.createElement('span');b.className='tier '+cls;b.textContent=val;wrap.appendChild(b);return wrap;}
+
+function el_vendormatch(){
+  const m=state.vars.match;const d=document.createElement('div');
+  if(!m||m.kind==='pending'){d.className='banner info';
+    d.innerHTML='Checked against the vendor inventory as you type - matching is <b>fuzzy</b>, so a misspelling still finds the vendor.';return d;}
+  if(m.kind==='unconfigured'){d.className='banner warn';
+    d.innerHTML='<b>No backend configured.</b> Paste the API URL above and press Save to enable live duplicate checking.';return d;}
+  if(m.kind==='error'){d.className='banner bad';
+    d.innerHTML='<b>Could not reach the matching service.</b> '+esc(m.message||'')
+      +'<br><span style="opacity:.8">If the database was idle it may be waking up - wait a few seconds and keep typing.</span>';return d;}
+  if(m.kind==='none'){d.className='banner ok';d.textContent='No match in inventory - this looks new. Continue.';return d;}
+  const v=m.vendor,pct=Math.round(m.score*100);
+  const conf=m.kind==='strong'?'Match':'Possible match';
+  const statusWord={approved:'already approved',in_review:'already in review',rejected:'previously rejected'}[v.status]||v.status;
+  d.className='banner '+(v.status==='approved'?'ok':v.status==='in_review'?'warn':'bad');
+  let html='<b>'+conf+' ('+pct+'%):</b> "'+esc(v.name)+'" is '+statusWord+' in inventory.';
+  if(v.status==='rejected')html+=' Adopting it requires the exception process.';
+  if(v.items&&v.items.length)html+='<br><span style="opacity:.8">Known items: '+v.items.map(esc).join(', ')+'</span>';
+  d.innerHTML=html;return d;}
+
+function renderElement(el,store,ctx,idbase){
+  if(el.visibleIf&&!evaluateCondition(el.visibleIf,ctx))return null;
+  const id=idbase+'__'+(el.name||'x');
+  if(el.type==='html'){
+    if(el.name==='vendor_match_display')return el_vendormatch();
+    const d=document.createElement('div');d.className='banner info';d.innerHTML=el.html;return d;}
+  if(el.type==='panel'){
+    const p=document.createElement('div');p.className='subpanel';
+    if(el.title){const h=document.createElement('div');h.className='panel-h';h.textContent=el.title;p.appendChild(h);}
+    if(el.description){const dd=document.createElement('div');dd.className='panel-d';dd.textContent=el.description;p.appendChild(dd);}
+    (el.elements||[]).forEach(c=>{const n=renderElement(c,store,ctx,id);if(n)p.appendChild(n);});return p;}
+  if(el.type==='paneldynamic')return renderPaneldynamic(el,store,id);
+
+  const q=document.createElement('div');q.className='q'+(state.errors[id]?' err':'');
+  if(el.title){const lab=document.createElement('label');lab.className='qlabel';lab.textContent=el.title;
+    if(el.isRequired){const s=document.createElement('span');s.className='req';s.textContent='*';lab.appendChild(s);}
+    q.appendChild(lab);}
+  if(el.description){const dd=document.createElement('div');dd.className='qdesc';dd.textContent=el.description;q.appendChild(dd);}
+  let ctrl=null;
+  switch(el.type){
+    case 'text':ctrl=el_text(el,store,id);break;
+    case 'comment':ctrl=el_comment(el,store,id);break;
+    case 'dropdown':ctrl=el_dropdown(el,store,id);break;
+    case 'radiogroup':ctrl=el_radio(el,store,id);break;
+    case 'checkbox':ctrl=el_checkbox(el,store,id);break;
+    case 'boolean':ctrl=el_boolean(el,store,id);break;
+    case 'rating':ctrl=el_rating(el,store,id);break;
+    case 'expression':ctrl=el_expression(el,store,ctx);break;
+    default:ctrl=document.createElement('div');
+  }
+  q.appendChild(ctrl);
+  if(state.errors[id]){const e=document.createElement('div');e.className='errmsg';e.textContent=state.errors[id];q.appendChild(e);}
+  return q;}
+
+function renderPaneldynamic(el,store,idbase){
+  if(!Array.isArray(store[el.name])){const n=Math.max(el.panelCount||1,el.minPanelCount||0)||1;
+    store[el.name]=Array.from({length:n},()=>({}));}
+  const arr=store[el.name];const wrap=document.createElement('div');
+  arr.forEach((panelObj,i)=>{const pctx={data:state.data,vars:state.vars,panel:panelObj};
+    const item=document.createElement('div');item.className='pd-item';
+    const head=document.createElement('div');head.className='pd-head';
+    const t=document.createElement('div');t.className='t';
+    t.textContent=el.templateTitle?interp(el.templateTitle,panelObj,i):('Item '+(i+1));
+    head.appendChild(t);
+    if(el.allowRemovePanel!==false&&arr.length>(el.minPanelCount||1)){
+      const rm=document.createElement('button');rm.className='btn-remove';rm.type='button';
+      rm.textContent=el.panelRemoveText||'Remove';
+      rm.addEventListener('click',()=>{arr.splice(i,1);renderApp();});head.appendChild(rm);}
+    item.appendChild(head);
+    (el.templateElements||[]).forEach(c=>{const n=renderElement(c,panelObj,pctx,idbase+'__'+i);if(n)item.appendChild(n);});
+    wrap.appendChild(item);});
+  if(el.allowAddPanel!==false){const row=document.createElement('div');row.className='add-row';
+    const add=document.createElement('button');add.className='btn-link';add.type='button';
+    add.textContent='+ '+(el.panelAddText||'Add another');
+    add.addEventListener('click',()=>{arr.push({});renderApp();});row.appendChild(add);wrap.appendChild(row);}
+  return wrap;}
+
+/* ===== validation ===== */
+function collectMissing(elements,store,ctx,idbase,out){
+  (elements||[]).forEach(el=>{
+    if(el.visibleIf&&!evaluateCondition(el.visibleIf,ctx))return;
+    const id=idbase+'__'+(el.name||'x');
+    if(el.type==='panel'){collectMissing(el.elements,store,ctx,id,out);return;}
+    if(el.type==='paneldynamic'){const arr=store[el.name]||[];
+      if(el.isRequired&&arr.length===0)out.push({id,msg:'Add at least one.'});
+      arr.forEach((p,i)=>collectMissing(el.templateElements,p,{data:state.data,vars:state.vars,panel:p},id+'__'+i,out));return;}
+    if(el.type==='html'||el.type==='expression')return;
+    if(el.isRequired){const v=store[el.name];
+      if(isEmpty(v))out.push({id,msg:'This field is required.'});
+      else if(el.inputType==='email'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(v)))out.push({id,msg:'Enter a valid email.'});}
+  });}
+function validatePage(page){clearErrors();const out=[];
+  collectMissing(page.elements,state.data,topCtx(),page.name,out);
+  out.forEach(o=>setError(o.id,o.msg));return out.length===0;}
+
+/* ===== app render ===== */
+function renderApp(){
+  const active=document.activeElement;let fId=null,caret=null;
+  if(active&&active.dataset&&active.dataset.qid){fId=active.id;try{caret=active.selectionStart;}catch(e){}}
+  app.innerHTML='';
+  if(state.submitted){renderResults();return;}
+  const vp=visiblePages();
+  if(!vp.some(p=>p.name===state.currentPage))state.currentPage=vp[vp.length-1].name;
+  const idx=vp.findIndex(p=>p.name===state.currentPage);const page=vp[idx];
+
+  const head=document.createElement('div');head.className='head';
+  head.innerHTML='<h1>'+SCHEMA.title+'</h1><p>'+(SCHEMA.description||'')+'</p>';app.appendChild(head);
+  const prog=document.createElement('div');prog.className='progress';
+  const bar=document.createElement('div');bar.style.width=Math.round(((idx+1)/vp.length)*100)+'%';
+  prog.appendChild(bar);app.appendChild(prog);
+
+  const sl=document.createElement('div');sl.className='step-label';sl.textContent='Step '+(idx+1)+' of '+vp.length;app.appendChild(sl);
+
+  if(idx===0){const hint=document.createElement('div');hint.className='hint';
+    /* These are the vendors loaded by backend/db/seed.sql. Listed here purely
+       as a demo cheat-sheet - the live matching reads them from Aurora. */
+    const seeded=[['Acme Software, Inc.','approved'],['Globex Corporation','in review'],
+      ['Initech LLC','approved'],['Umbrella Health Systems','rejected'],['Hooli Inc.','approved'],
+      ['Stark Industries','approved'],['Wayne Enterprises','in review'],['Cyberdyne Systems','rejected'],
+      ['Soylent Foods Co.','approved'],['Vandelay Industries','approved'],
+      ['Massive Dynamic','in review'],['Pied Piper, Inc.','rejected']];
+    const rows=seeded.map(v=>esc(v[0])+' - '+v[1]).join('<br>');
+    hint.innerHTML='<b>Watch the branching:</b> on the vendor step, type a vendor name - matching runs in Postgres and is <b>fuzzy</b>, so "Cyberdine Systems" still finds "Cyberdyne Systems". On the items step, choose sensitive data, integration, or high criticality to reveal the follow-up panels, and add more than one item per vendor.'
+      +'<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">Seeded inventory ('+seeded.length+' vendors) - type these, or misspell them</summary><div style="margin-top:6px;font-size:12.5px;color:var(--muted);line-height:1.7">'+rows+'</div></details>';
+    app.appendChild(hint);}
+
+  const body=document.createElement('div');body.className='body';
+  const pt=document.createElement('div');pt.className='page-title';pt.textContent=page.title||'';body.appendChild(pt);
+  if(page.description){const pd=document.createElement('div');pd.className='page-desc';pd.textContent=page.description;body.appendChild(pd);}
+
+  if(idx===0||page.name==='vendor')body.appendChild(buildApiBar());
+  if(Object.keys(state.errors).length){const b=document.createElement('div');b.className='banner bad';
+    b.textContent='Please complete the required fields highlighted below.';body.appendChild(b);}
+
+  page.elements.forEach(el=>{const n=renderElement(el,state.data,topCtx(),page.name);if(n)body.appendChild(n);});
+  app.appendChild(body);
+
+  const foot=document.createElement('div');foot.className='foot';
+  const stopped=state.data.match_action==='same_stop'&&page.name==='vendor';
+  const left=document.createElement('div');const right=document.createElement('div');
+  if(idx>0){const prev=document.createElement('button');prev.className='btn btn-ghost';prev.textContent='Back';
+    prev.addEventListener('click',()=>{const i2=vp.findIndex(p=>p.name===state.currentPage);
+      if(i2>0){clearErrors();state.currentPage=vp[i2-1].name;renderApp();}});left.appendChild(prev);}
+  if(stopped){const note=document.createElement('div');note.className='banner ok';note.style.margin='0';
+    note.textContent='Already on file - no new submission needed.';left.appendChild(note);
+    const reset=document.createElement('button');reset.className='btn btn-ghost';reset.textContent='Start over';
+    reset.addEventListener('click',resetDemo);right.appendChild(reset);}
+  else if(idx<vp.length-1){const next=document.createElement('button');next.className='btn btn-primary';next.textContent='Continue';
+    next.addEventListener('click',()=>{if(validatePage(page)){const i2=visiblePages().findIndex(p=>p.name===state.currentPage);
+      const vp2=visiblePages();state.currentPage=vp2[Math.min(i2+1,vp2.length-1)].name;}renderApp();});right.appendChild(next);}
+  else{const sub=document.createElement('button');sub.className='btn btn-primary';sub.textContent='Submit';
+    sub.addEventListener('click',()=>{if(validatePage(page))submitForm();renderApp();});right.appendChild(sub);}
+  foot.appendChild(left);foot.appendChild(right);app.appendChild(foot);
+
+  if(fId){const e=document.getElementById(fId);if(e){e.focus();if(caret!=null){try{e.setSelectionRange(caret,caret);}catch(x){}}}}
+}
+
+async function submitForm(){
+  const payload=JSON.parse(JSON.stringify(state.data));
+  /* Compute the provisional tier per item so the stored record carries it,
+     rather than it only existing as a display expression in the form. */
+  if(Array.isArray(payload.third_party_items)){
+    payload.third_party_items.forEach(it=>{
+      it.provisional_tier=evalExpression(
+        "iif({panel.data_types} anyof ['phi','pci','secrets'] or {panel.privileged_access} = true, 'Tier 1 - High', iif({panel.data_types} anyof ['pii','financial'] or {panel.criticality} >= 4 or {panel.integrates} = true, 'Tier 2 - Medium', 'Tier 3 - Low'))",
+        {data:state.data,vars:state.vars,panel:it});});}
+  payload.vendorMatchStatus=state.vars.vendorMatchStatus||'none';
+
+  state.payload=payload;state.submitted=true;
+  state.saving=true;state.saveError=null;state.saveResult=null;
+  renderApp();                                   // show the "saving" state now
+
+  try{
+    if(!API_BASE)throw new Error('No API base URL configured - nothing was stored.');
+    const res=await fetch(API_BASE+'/submit',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify(payload)});
+    if(!res.ok)throw new Error('submit returned HTTP '+res.status);
+    state.saveResult=await res.json();
+  }catch(err){
+    state.saveError=err.message||'Could not reach the submit endpoint.';
+  }
+  state.saving=false;renderApp();}
+
+function renderResults(){
+  const head=document.createElement('div');head.className='head';
+  head.innerHTML='<h1>Submission captured</h1><p>This is the structured payload sent to the backend.</p>';app.appendChild(head);
+  const body=document.createElement('div');body.className='body';
+
+  /* Three possible states: still writing to Aurora, stored, or failed. */
+  const b=document.createElement('div');
+  if(state.saving){
+    b.className='banner info';b.textContent='Saving to the database...';
+  }else if(state.saveError){
+    b.className='banner bad';
+    b.innerHTML='<b>Not stored.</b> '+esc(state.saveError)
+      +'<br><span style="opacity:.8">The payload below is still correct - it just did not reach the database.</span>';
+  }else if(state.saveResult){
+    b.className='banner ok';
+    b.innerHTML='<b>Stored.</b> Submission id <code>'+esc(state.saveResult.submissionId)+'</code>'
+      +'<br><span style="opacity:.8">Vendor '+(state.saveResult.vendorCreated?'created':'matched to an existing record')
+      +' ('+esc(state.saveResult.vendorId)+') with '+(state.saveResult.itemIds||[]).length+' item(s).</span>';
+  }
+  body.appendChild(b);
+
+  const pre=document.createElement('pre');pre.textContent=JSON.stringify(state.payload,null,2);body.appendChild(pre);
+  app.appendChild(body);
+  const foot=document.createElement('div');foot.className='foot';const sp=document.createElement('div');
+  const reset=document.createElement('button');reset.className='btn btn-primary';reset.textContent='Run the demo again';
+  reset.addEventListener('click',resetDemo);foot.appendChild(sp);foot.appendChild(reset);app.appendChild(foot);}
+
+function resetDemo(){state.data={};state.vars={};state.errors={};state.submitted=false;state.payload=null;
+  state.saving=false;state.saveResult=null;state.saveError=null;
+  state.currentPage=SCHEMA.pages[0].name;renderApp();}
+
+renderApp();
+</script>
+</body>
+</html>
