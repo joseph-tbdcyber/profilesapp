@@ -60,9 +60,26 @@ export const handler = async (event: { body?: string | null }) => {
       return respond(200, { topStatus: null, candidates: [], reason: 'too_short' });
     }
 
-    // GREATEST(...) means an exact domain hit scores a perfect 1 even if the
-    // company name was typed completely differently - domain is the strongest
-    // available signal that this is the same company.
+    // Score is the best of three signals:
+    //
+    //  1. similarity()      - whole-string trigram overlap. Good for typos:
+    //                         "cyberdine systems" vs "cyberdyne systems" = 0.71.
+    //
+    //  2. word_similarity() - matches what was typed against the best PORTION of
+    //                         the stored name. This is what makes prefixes work:
+    //                         similarity('acme software','acme') is only 0.36
+    //                         because the lengths differ, but word_similarity is
+    //                         1.0. Someone typing "Acme" for "Acme Software, Inc."
+    //                         is the most common duplicate case there is, so
+    //                         without this the whole feature misses it.
+    //                         Argument order matters: typed text first.
+    //
+    //  3. exact domain hit  - scores a perfect 1 even if the name was typed
+    //                         completely differently. The strongest signal there is.
+    //
+    // NOTE: written as functions rather than the % and <% operators, so this does
+    // a sequential scan and the trigram index goes unused. Fine for a demo-sized
+    // table; at real volume, switch to the operators so the GIN index applies.
     //
     // The items sub-select gives the form the "Known items: ..." line.
     const rows = await query<MatchRow>(
@@ -74,6 +91,7 @@ export const handler = async (event: { body?: string | null }) => {
         v.status,
         GREATEST(
           similarity(v.normalized_name, :name),
+          word_similarity(:name, v.normalized_name),
           CASE WHEN :domain <> '' AND v.primary_domain = :domain THEN 1.0 ELSE 0.0 END
         )::float8 AS score,
         (
@@ -83,7 +101,9 @@ export const handler = async (event: { body?: string | null }) => {
         ) AS items
       FROM vendors v
       WHERE
-        (:name <> '' AND similarity(v.normalized_name, :name) >= :threshold)
+        (:name <> '' AND (
+           similarity(v.normalized_name, :name) >= :threshold
+           OR word_similarity(:name, v.normalized_name) >= :threshold))
         OR (:domain <> '' AND v.primary_domain = :domain)
       ORDER BY score DESC, v.legal_name ASC
       LIMIT 5

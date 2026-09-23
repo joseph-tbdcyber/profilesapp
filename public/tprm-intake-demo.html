@@ -579,7 +579,7 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
    the vendor step, or from the console:
      localStorage.setItem('tprm_api_base','https://...'); location.reload();
 */
-const API_BASE_DEFAULT='';
+const API_BASE_DEFAULT='https://sczs2nm4fl.execute-api.us-east-2.amazonaws.com';
 const API_BASE=(localStorage.getItem('tprm_api_base')||API_BASE_DEFAULT).replace(/\/+$/,'');
 
 /* Kept locally only to decide whether what has been typed is worth sending.

@@ -30,45 +30,74 @@ account's **default VPC**, so no networking resources are created.
    ```bash
    aws sts get-caller-identity     # should print your account; if not, run: aws login
    ```
-2. **AWS SAM CLI** — *not currently installed on this machine.* Install it:
+2. **AWS SAM CLI**. The winget installer needs Administrator rights and fails
+   with exit code 1602 without them. The pip install needs no elevation and is
+   what this project was deployed with:
    ```bash
-   winget install Amazon.SAM-CLI
+   python -m pip install aws-sam-cli
+   sam --version          # SAM CLI, version 1.166.2
    ```
-   Then **restart your terminal** and confirm: `sam --version`
+   (If you prefer a system-wide install, run
+   `winget install --id Amazon.SAM-CLI -e` from an **Administrator** terminal.)
 3. **Node.js 20+** (you have v24) — used to build the Lambdas and run the DB script.
+4. **esbuild on your PATH.** `sam build` compiles the TypeScript with esbuild, but
+   SAM's internal `npm install` step is production-only, so it never installs the
+   devDependency. Put the local copy on PATH for the build:
+   ```bash
+   export PATH="$PWD/src/node_modules/.bin:$PATH"     # bash
+   $env:PATH = "$PWD\src\node_modules\.bin;$env:PATH" # PowerShell
+   ```
+   Without this, `sam build` fails with *"Cannot find esbuild"*.
 
 ---
 
 ## Step 1 — Deploy
 
-From this `backend/` directory:
+From this `backend/` directory, with esbuild on PATH (see prerequisite 4):
 
 ```bash
 sam build
-sam deploy --guided --stack-name tprm-backend --region us-east-2
 ```
 
-`--guided` asks you a series of questions. Safe answers:
+Then deploy. This is the exact command used, with every parameter supplied so
+there are no interactive prompts — **paste it as a single line** (PowerShell
+does not accept `\` as a line continuation; its continuation character is a
+backtick):
 
-- **Stack Name** → `tprm-backend`
-- **AWS Region** → `us-east-2`
-- **Parameter DatabaseName** → `tprm`
-- **Parameter EngineVersion** → accept the default
-- **Parameter MinAcu** → `0` (lets the database pause when idle — this is the main cost saver)
-- **Parameter MaxAcu** → `1` (a spend ceiling; raise it if queries feel slow)
-- **Parameter SecondsUntilAutoPause** → `300`
-- **Parameter AllowedOrigin** → accept the default (your Amplify URL)
-- **Confirm changes before deploy** → `y`
-- **Allow SAM CLI IAM role creation** → `y` (it needs to create the Lambda roles)
-- **Disable rollback** → `N`
-- **Save arguments to configuration file** → `y` (so future deploys are just `sam deploy`)
+```powershell
+sam deploy --stack-name tprm-backend --region us-east-2 --capabilities CAPABILITY_IAM --resolve-s3 --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides "DatabaseName=tprm EngineVersion=16.15 MinAcu=0 MaxAcu=1 SecondsUntilAutoPause=300 AllowedOrigin=https://main.d1jqxcw68kj5bb.amplifyapp.com"
+```
+
+What those parameters mean:
+
+| Parameter | Value | Why |
+|---|---|---|
+| `MinAcu` | `0` | Enables auto-pause — the main cost saver |
+| `MaxAcu` | `1` | Spend ceiling; raise it if queries feel slow |
+| `SecondsUntilAutoPause` | `300` | 5 minutes, the minimum |
+| `EngineVersion` | `16.15` | New enough to support scale-to-zero |
+| `AllowedOrigin` | Amplify URL | CORS allowlist |
+| `--resolve-s3` | — | Creates a small managed bucket for build artifacts |
 
 The first deploy takes **10–15 minutes**, almost all of it waiting for Aurora.
 
-When it finishes it prints an Outputs table. The one you need:
+> **If the deploy fails and the stack ends up in `ROLLBACK_COMPLETE`**, you must
+> delete it before retrying — CloudFormation cannot update a stack in that state:
+> ```bash
+> aws cloudformation delete-stack --stack-name tprm-backend --region us-east-2
+> ```
+> Check what actually failed with:
+> ```bash
+> aws cloudformation describe-stack-events --stack-name tprm-backend --region us-east-2 \
+>   --query "StackEvents[?ResourceStatus=='CREATE_FAILED'].{R:LogicalResourceId,Why:ResourceStatusReason}" --output text
+> ```
+> Running `sam validate --lint` **before** deploying catches most template
+> problems in seconds rather than after a 15-minute failure.
+
+When it finishes it prints an Outputs table. The current deployment:
 
 ```
-ApiBaseUrl   https://xxxxxxxx.execute-api.us-east-2.amazonaws.com
+ApiBaseUrl   https://sczs2nm4fl.execute-api.us-east-2.amazonaws.com
 ```
 
 ---
@@ -101,36 +130,45 @@ Use `npm run init-db -- --schema-only` to skip the sample vendors.
 
 ## Step 3 — Point the form at the API
 
-The form is at `../public/tprm-intake-demo.html` and ships with no API URL set.
-Two ways to configure it:
+**Already done.** `../public/tprm-intake-demo.html` has the deployed URL baked in:
 
-**Quick (no code change):** open the form, and on the first or vendor step paste
-the `ApiBaseUrl` into the **Backend** box and press Save. It's remembered in
-your browser's local storage.
-
-**Permanent:** edit the file and set the default:
 ```js
-const API_BASE_DEFAULT='https://xxxxxxxx.execute-api.us-east-2.amazonaws.com';
+const API_BASE_DEFAULT='https://sczs2nm4fl.execute-api.us-east-2.amazonaws.com';
 ```
-Then commit and push — Amplify serves it at
-`https://main.d1jqxcw68kj5bb.amplifyapp.com/tprm-intake-demo.html`.
+
+Amplify serves it at
+**https://main.d1jqxcw68kj5bb.amplifyapp.com/tprm-intake-demo.html**
+
+To point it somewhere else without editing the file, use the **Backend** box on
+the vendor step — it saves to browser local storage and overrides the default.
+If you redeploy into a fresh stack, the API URL changes, so update the constant.
 
 ---
 
 ## Step 4 — Test it
 
-**Matching** (should return the seeded Acme vendor):
+Set `API=https://sczs2nm4fl.execute-api.us-east-2.amazonaws.com` first.
+
+**Matching** — real verified responses:
+
 ```bash
-curl -s -X POST "$API/vendor-match" \
-  -H 'content-type: application/json' \
-  -d '{"name":"Acme"}'
+curl -s -X POST "$API/vendor-match" -H 'content-type: application/json' -d '{"name":"Acme"}'
 ```
 ```json
-{"topStatus":"approved","candidates":[{"legalName":"Acme Software, Inc.","status":"approved","score":0.55,"confidence":"possible","items":["Acme Analytics Cloud","Acme Mail Gateway"]}]}
+{"topStatus":"approved","candidates":[{"legalName":"Acme Software, Inc.","domain":"acme.com","status":"approved","score":1,"confidence":"strong","items":["Acme Analytics Cloud","Acme Mail Gateway"]}]}
 ```
 
-Try a misspelling — `{"name":"Cyberdine Systems"}` still finds Cyberdyne. That's
-`pg_trgm` doing fuzzy comparison inside Postgres.
+| Input | Result |
+|---|---|
+| `{"name":"Acme"}` | Acme Software, score **1.0**, approved |
+| `{"name":"Cyberdine Systems"}` *(misspelled)* | Cyberdyne Systems, score **0.714**, rejected |
+| `{"domain":"https://www.initech.com/products"}` | Initech LLC, score **1.0** (exact domain) |
+| `{"name":"Zzyzx Unrelated Holdings"}` | `topStatus: "none"`, no candidates |
+
+Scoring takes the best of three signals: whole-string `similarity()` for typos,
+`word_similarity()` so a typed prefix ("Acme" → "Acme Software, Inc.") scores
+full marks, and an exact domain match. Using `similarity()` alone scores "Acme"
+at just 0.357 and misses the duplicate entirely.
 
 **Submitting:**
 ```bash
@@ -159,24 +197,35 @@ Complete the form and the final screen shows the stored submission id.
 
 ## Costs
 
-The meaningful drivers, cheapest-first:
+Live rates for **us-east-2**, from the AWS Pricing API:
 
-- **Compute (ACUs)** — billed per ACU-hour. With `MinAcu=0` the cluster pauses
-  after 5 idle minutes and **stops billing compute entirely**. This is why the
-  demo is cheap: it costs almost nothing when nobody is using it.
-- **Storage** — billed per GB-month for what you actually use. A seeded demo
-  database is tiny, but storage bills **even while the cluster is paused**.
-- **Backups** — retention is set to the 1-day minimum.
-- **Secrets Manager** — one secret, billed monthly.
-- **Lambda / API Gateway / Data API** — per request; a demo's traffic is
-  negligible and may fall inside the free tier.
+| Item | Rate |
+|---|---|
+| Aurora Serverless v2 (PostgreSQL) | **$0.12 per ACU-hour** |
+| Aurora storage | **$0.10 per GB-month** |
 
-I'm deliberately not quoting dollar figures — check the live
-[Aurora pricing page](https://aws.amazon.com/rds/aurora/pricing/) for us-east-2,
-and watch **Cost Explorer** for the first day or two.
+What that means with `MaxAcu=1`:
 
-The thing to remember: **a paused cluster still bills for storage.** If you're
-done with the demo, tear it down rather than leaving it paused.
+- **Worst case ≈ $88/month.** That is 1 ACU × 730 hours × $0.12 — the cluster
+  never pausing and pinned at its cap. `MaxAcu=1` exists to make this the ceiling.
+- **Realistic demo use: single-digit dollars.** With auto-pause at 5 idle minutes
+  you only pay for minutes actually in use; an hour or two of demoing a day is
+  roughly $4–7/month.
+- **Storage is pennies** at this size — but it bills **even while paused**, which
+  is why an idle stack is not free.
+- **Secrets Manager** adds a small per-secret monthly charge.
+- **Lambda / API Gateway / Data API** are negligible at demo traffic.
+
+These are cost ceilings, not a sizing recommendation. Real sizing needs measured
+metrics — watch `ACUUtilization` and `ServerlessDatabaseCapacity` in CloudWatch
+before changing `MaxAcu`.
+
+The number to watch is whether auto-pause actually engages. If it does not, you
+drift toward the $88 ceiling instead of single digits. Check Cost Explorer after
+the first day or two.
+
+**A paused cluster still bills for storage.** If you are done, tear it down
+rather than leaving it paused.
 
 Watch `ACUUtilization` and `ServerlessDatabaseCapacity` in CloudWatch to see
 whether `MaxAcu=1` is actually constraining you before raising it.
