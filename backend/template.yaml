@@ -122,7 +122,7 @@ Resources:
         - Key: created_by
           Value: aurora-skill
         - Key: generation_model
-          Value: claude-opus-5[1m]
+          Value: claude-opus-5-1m
         - Key: project
           Value: tprm-intake-poc
 
@@ -140,7 +140,7 @@ Resources:
         - Key: created_by
           Value: aurora-skill
         - Key: generation_model
-          Value: claude-opus-5[1m]
+          Value: claude-opus-5-1m
         - Key: project
           Value: tprm-intake-poc
 

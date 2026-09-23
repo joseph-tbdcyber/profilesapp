@@ -13,6 +13,9 @@ dist
 dist-ssr
 *.local
 
+# SAM build artifacts
+.aws-sam
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
