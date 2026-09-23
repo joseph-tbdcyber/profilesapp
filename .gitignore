@@ -31,3 +31,8 @@ dist-ssr
 .amplify
 amplify_outputs*
 amplifyconfiguration*
+
+# Work in progress: the post-confirmation trigger is half-written and fails the
+# Amplify backend typecheck, which fails the whole build. Kept local until it is
+# finished. Remove this line to start tracking it again.
+amplify/auth/post-confirmation/
