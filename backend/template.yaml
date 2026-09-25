@@ -180,6 +180,92 @@ Resources:
         MaxAge: 300
 
   # =========================================================================
+  # READ-ONLY DATABASE CONSOLE
+  # =========================================================================
+  # Backs the console on the app's landing page: shows the topology (Aurora
+  # cluster, its tables, and the Amplify DynamoDB tables) and runs SELECTs.
+  #
+  # >>> THIS ENDPOINT IS PUBLIC AND UNAUTHENTICATED. <<<
+  # Anyone with the URL can read the database. That is an accepted trade-off
+  # for a demo holding fake data, and would NOT be acceptable for real data.
+  # Writes are blocked by a Postgres READ ONLY transaction in the handler -
+  # see the security notes at the top of src/admin/index.ts.
+  #
+  # Note this function gets STRICTLY MORE permission than the other two: it can
+  # describe the cluster and list DynamoDB tables. Those are read-only
+  # describe/list calls, and it still cannot touch anything outside this
+  # cluster and this one secret.
+  AdminFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: es2022
+        Sourcemap: true
+        EntryPoints:
+          - admin/index.ts
+    Properties:
+      CodeUri: src/
+      Handler: admin/index.handler
+      Runtime: nodejs22.x
+      # 29s, deliberately under API Gateway HTTP API 30s integration cap:
+      # a function that outruns the gateway just yields an opaque 503.
+      # If the cluster is still waking at that point the handler returns
+      # 503 database_resuming and the console retries.
+      Timeout: 29
+      MemorySize: 512
+      Environment:
+        Variables:
+          CLUSTER_ARN: !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:cluster:${DbCluster}
+          SECRET_ARN: !GetAtt DbCluster.MasterUserSecret.SecretArn
+          DATABASE_NAME: !Ref DatabaseName
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - rds-data:ExecuteStatement
+                - rds-data:BeginTransaction
+                # Rollback but NOT Commit. The console never commits anything,
+                # so withholding the permission makes that structural rather
+                # than merely intended.
+                - rds-data:RollbackTransaction
+              Resource: !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:cluster:${DbCluster}
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !GetAtt DbCluster.MasterUserSecret.SecretArn
+            # Cluster metadata for the topology view (status, engine, ACU range).
+            - Effect: Allow
+              Action: rds:DescribeDBClusters
+              Resource: '*'
+            # Live ACU reading. DescribeDBClusters.Capacity is a Serverless v1
+            # field and is always null on v2, so the real number comes from the
+            # ServerlessDatabaseCapacity metric.
+            - Effect: Allow
+              Action: cloudwatch:GetMetricStatistics
+              Resource: '*'
+            # Listing DynamoDB tables so the console can show both data stores.
+            # Read-only, and DescribeTable returns structure, never item data.
+            - Effect: Allow
+              Action:
+                - dynamodb:ListTables
+                - dynamodb:DescribeTable
+              Resource: '*'
+      Events:
+        Schema:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /admin/schema
+            Method: POST
+        Query:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /admin/query
+            Method: POST
+
+  # =========================================================================
   # LAMBDA FUNCTIONS
   # =========================================================================
   # Shared settings so we don't repeat ourselves on every function.
@@ -201,7 +287,9 @@ Resources:
       CodeUri: src/
       Handler: vendor-match/index.handler
       Runtime: nodejs22.x
-      Timeout: 30
+      # 29s, deliberately under API Gateway HTTP API 30s integration cap:
+      # a function that outruns the gateway just yields an opaque 503.
+      Timeout: 29
       MemorySize: 512
       Environment:
         Variables:
@@ -242,7 +330,9 @@ Resources:
       CodeUri: src/
       Handler: submit/index.handler
       Runtime: nodejs22.x
-      Timeout: 30
+      # 29s, deliberately under API Gateway HTTP API 30s integration cap:
+      # a function that outruns the gateway just yields an opaque 503.
+      Timeout: 29
       MemorySize: 512
       Environment:
         Variables:

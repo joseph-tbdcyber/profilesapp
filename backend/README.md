@@ -270,6 +270,50 @@ The Amplify frontend is a **separate stack** and is unaffected.
 
 ---
 
+## The database console
+
+The app's landing page (`/`) is a read-only database console:
+
+- **Topology** — the Aurora cluster (status, engine version, ACU range, and live
+  capacity from CloudWatch) with its tables, columns and row counts, plus the
+  Amplify DynamoDB tables listed alongside and marked non-queryable
+- **Query** — type SQL, Ctrl/⌘+Enter to run; click a table name to template a
+  `SELECT`
+- **Export** — CSV, TSV, JSON download, and "Copy for Excel" (tab-separated to
+  the clipboard, which pastes straight into a sheet)
+
+### It is read-only, and that is load-bearing
+
+**The `/admin/*` endpoints are public and unauthenticated.** Anyone with the URL
+can read the database. That is an accepted trade-off for a demo holding fake
+data and would be unacceptable for anything real. CORS does *not* protect them —
+CORS only constrains browsers, and `curl` ignores it.
+
+Writes are blocked by three layers, in descending order of importance:
+
+1. **A Postgres `READ ONLY` transaction that is always rolled back.** This is
+   the guarantee that matters — the engine refuses writes regardless of what SQL
+   reached it.
+2. **A 15-second statement timeout**, so an expensive query cannot pin the
+   cluster at max ACUs and run up the bill.
+3. **A parser check** (single statement; must begin SELECT/WITH/TABLE/EXPLAIN/SHOW).
+   The weakest layer, and never sufficient alone.
+
+Why layer 1 is not optional — all of these were tested against the live endpoint:
+
+| Query | Blocked by |
+|---|---|
+| `DELETE FROM vendors` | parser |
+| `DROP TABLE vendors` | parser |
+| `SELECT 1; DROP TABLE vendors` | parser (stacked statements) |
+| `WITH x AS (DELETE FROM vendors RETURNING *) SELECT count(*) FROM x` | **the engine** (`SQLState 25006`) |
+
+That last one starts with `WITH`, so it passes the parser cleanly. Without the
+read-only transaction it would have emptied the table.
+
+To make read-only a choice rather than a necessity, put a Cognito authorizer in
+front of the API — see the `TODO(auth)` comments.
+
 ## Layout
 
 ```

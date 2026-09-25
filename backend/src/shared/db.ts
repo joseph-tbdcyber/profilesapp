@@ -40,16 +40,31 @@ export function dbl(name: string, value: number): SqlParameter {
 }
 
 /**
- * The cluster auto-pauses when idle (MinAcu=0 in template.yaml). The first
- * request after a pause has to wake it up, and the Data API rejects that first
- * call while the cluster is resuming. Retrying a few times with a pause turns
- * that into "slow" instead of "broken".
+ * The cluster auto-pauses when idle (MinAcu=0 in template.yaml) and the Data API
+ * rejects calls while it is waking back up.
+ *
+ * We retry, but only briefly. A full resume can take longer than 30 seconds, and
+ * API Gateway's HTTP API cuts the integration off at 30s - so burning the whole
+ * budget here just produces an opaque "Service Unavailable" at the client with
+ * no idea why. Better to give the wake a short head start, then surface a
+ * DatabaseResumingError the caller can turn into "waking up, retrying…".
  */
 const RESUMING_ERRORS = new Set([
   'DatabaseResumingException',
   'StatementTimeoutException',
   'ServiceUnavailableError',
 ]);
+
+/** Total time spent retrying a resuming cluster before giving up and reporting. */
+const RESUME_RETRY_BUDGET_MS = 12_000;
+
+/** Thrown when the cluster is still waking. Callers should map this to a 503. */
+export class DatabaseResumingError extends Error {
+  constructor() {
+    super('The database is waking up from auto-pause. Try again in a few seconds.');
+    this.name = 'DatabaseResumingError';
+  }
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -64,10 +79,11 @@ export async function query<T = Record<string, unknown>>(
   parameters: SqlParameter[] = [],
   transactionId?: string,
 ): Promise<T[]> {
-  let lastError: unknown;
+  const deadline = Date.now() + RESUME_RETRY_BUDGET_MS;
+  let attempt = 0;
 
-  // Up to 5 attempts, backing off, to cover a cold cluster waking up.
-  for (let attempt = 0; attempt < 5; attempt++) {
+  // Retry only while inside the budget - see RESUME_RETRY_BUDGET_MS above.
+  for (;;) {
     try {
       const result = await client.send(
         new ExecuteStatementCommand({
@@ -85,16 +101,19 @@ export async function query<T = Record<string, unknown>>(
       if (!result.formattedRecords) return [];
       return JSON.parse(result.formattedRecords) as T[];
     } catch (err) {
-      lastError = err;
       const name = (err as { name?: string })?.name ?? '';
       if (!RESUMING_ERRORS.has(name)) throw err;   // a real error - do not retry
 
-      // Cluster is waking up. Wait and try again: 1s, 2s, 4s, 8s.
-      await sleep(1000 * 2 ** attempt);
+      // Out of budget: tell the caller the cluster is still waking rather than
+      // sitting here until API Gateway times the whole request out.
+      if (Date.now() >= deadline) throw new DatabaseResumingError();
+
+      // Still waking. Back off 1s, 2s, 4s... but never past the deadline.
+      const wait = Math.min(1000 * 2 ** attempt, deadline - Date.now());
+      attempt++;
+      if (wait > 0) await sleep(wait);
     }
   }
-
-  throw lastError;
 }
 
 /** Run several statements atomically - all of them commit, or none do. */
